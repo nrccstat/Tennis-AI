@@ -6,6 +6,51 @@ from sklearn.preprocessing import OneHotEncoder
 import pickle
 import os
 
+st.markdown('''
+    <style>
+    body {
+        background: linear-gradient(120deg, #f8fafc 0%, #e0e7ef 100%);
+    }
+    .stButton>button {
+        color: white;
+        background: #ff4b4b;
+        border-radius: 8px;
+        padding: 0.5em 2em;
+        font-weight: bold;
+        font-size: 1.1em;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        transition: 0.2s;
+    }
+    .stButton>button:hover {
+        background: #ff7878;
+        color: #fff;
+    }
+    .stSelectbox>div>div>div>div {
+        border-radius: 8px;
+        font-size: 1.05em;
+    }
+    .stMetric {
+        background: #f1f5fa;
+        border-radius: 12px;
+        padding: 1em;
+        margin-bottom: 1em;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+    .stDataFrame, .stTable {
+        background: #fff;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+    .stAlert {
+        border-radius: 10px;
+    }
+    .stProgress > div > div > div > div {
+        background-image: linear-gradient(90deg, #4f8cff, #38e8ff);
+        border-radius: 8px;
+    }
+    </style>
+''', unsafe_allow_html=True)
+
 st.set_page_config(
     page_title="Tennis Match Predictor",
     page_icon="🎾",
@@ -74,7 +119,6 @@ if submitted:
         if p1_stats is None or p2_stats is None:
             st.error("Could not find historical data for one or both players.")
         else:
-            # Create input data with all features
             input_data = pd.DataFrame({
                 'surface': [court_type],
                 'winner_elo': [p1_stats['elo']],
@@ -83,15 +127,15 @@ if submitted:
                 'winner_ht': [p1_stats['height']],
                 'loser_age': [p2_stats['age']],
                 'loser_ht': [p2_stats['height']],
-                'winner_recent_form': [p1_stats['elo']],  # Using current ELO as recent form
-                'loser_recent_form': [p2_stats['elo']],   # Using current ELO as recent form
-                'winner_surface_win_rate': [0.5],  # Default to 0.5 if not available
-                'loser_surface_win_rate': [0.5],   # Default to 0.5 if not available
-                'h2h_matches': [0],                # Default to 0 if not available
-                'winner_tourney_wins': [0],        # Default to 0 if not available
-                'loser_tourney_wins': [0],         # Default to 0 if not available
-                'winner_days_since_last_match': [0], # Default to 0 if not available
-                'loser_days_since_last_match': [0]   # Default to 0 if not available
+                'winner_recent_form': [p1_stats['elo']],  
+                'loser_recent_form': [p2_stats['elo']],   
+                'winner_surface_win_rate': [0.5],  
+                'loser_surface_win_rate': [0.5],   
+                'h2h_matches': [0],               
+                'winner_tourney_wins': [0],        
+                'loser_tourney_wins': [0],         
+                'winner_days_since_last_match': [0], 
+                'loser_days_since_last_match': [0]   
             })
             
             numeric_columns = [
