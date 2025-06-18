@@ -33,7 +33,10 @@ def load_data():
 def load_model():
     model = pickle.load(open('models/tennis_model.pkl', 'rb'))
     encoder = pickle.load(open('models/encoder.pkl', 'rb'))
-    return model, encoder
+    feature_columns = pickle.load(open('models/feature_columns.pkl', 'rb'))
+    # Filter out the one-hot encoded surface columns
+    base_features = [col for col in feature_columns if not col.startswith('surface_')]
+    return model, encoder, base_features
 
 df = load_data()
 all_players = sorted(set(df['winner_name'].unique()) | set(df['loser_name'].unique()))
@@ -65,12 +68,13 @@ with st.form("match_prediction_form"):
 
 if submitted:
     try:
-        model, encoder = load_model()
+        model, encoder, base_features = load_model()
         p1_stats = get_player_stats(player1, df)
         p2_stats = get_player_stats(player2, df)
         if p1_stats is None or p2_stats is None:
             st.error("Could not find historical data for one or both players.")
         else:
+            # Create input data with all features
             input_data = pd.DataFrame({
                 'surface': [court_type],
                 'winner_elo': [p1_stats['elo']],
@@ -78,12 +82,31 @@ if submitted:
                 'winner_age': [p1_stats['age']],
                 'winner_ht': [p1_stats['height']],
                 'loser_age': [p2_stats['age']],
-                'loser_ht': [p2_stats['height']]
+                'loser_ht': [p2_stats['height']],
+                'winner_recent_form': [p1_stats['elo']],  # Using current ELO as recent form
+                'loser_recent_form': [p2_stats['elo']],   # Using current ELO as recent form
+                'winner_surface_win_rate': [0.5],  # Default to 0.5 if not available
+                'loser_surface_win_rate': [0.5],   # Default to 0.5 if not available
+                'h2h_matches': [0],                # Default to 0 if not available
+                'winner_tourney_wins': [0],        # Default to 0 if not available
+                'loser_tourney_wins': [0],         # Default to 0 if not available
+                'winner_days_since_last_match': [0], # Default to 0 if not available
+                'loser_days_since_last_match': [0]   # Default to 0 if not available
             })
+            
+            numeric_columns = [
+                'winner_elo', 'loser_elo', 'winner_age', 'winner_ht', 'loser_age', 'loser_ht',
+                'winner_recent_form', 'loser_recent_form', 'winner_surface_win_rate', 'loser_surface_win_rate',
+                'h2h_matches', 'winner_tourney_wins', 'loser_tourney_wins',
+                'winner_days_since_last_match', 'loser_days_since_last_match'
+            ]
+            
             cat_features = ['surface']
-            X_cat = encoder.transform(input_data[cat_features])
-            X_num = input_data[['winner_elo', 'loser_elo', 'winner_age', 'winner_ht', 'loser_age', 'loser_ht']].values
-            X = np.hstack([X_num, X_cat])
+            X_cat = input_data[cat_features]
+            X_cat_encoded = encoder.transform(X_cat)
+            
+            X_num = input_data[numeric_columns].values
+            X = np.hstack([X_num, X_cat_encoded])
             prob = model.predict_proba(X)[0]
             st.subheader("Prediction Results")
             col1, col2 = st.columns(2)
@@ -118,4 +141,4 @@ if submitted:
         st.info("Please make sure the model files are available in the 'models' directory.")
 
 st.markdown("---")
-st.markdown("Built with ❤️ using Streamlit and Machine Learning") 
+st.markdown("Built with using Streamlit and Machine Learning") 
