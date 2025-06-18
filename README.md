@@ -7,6 +7,7 @@ This project is a machine learning pipeline and web app for predicting ATP tenni
 - Calculates Elo ratings for all players
 - Predicts match outcomes and win probabilities
 - Interactive Streamlit UI for user-friendly predictions
+- Custom CSS styling for a modern, polished interface
 - Modular code for easy extension and experimentation
 
 ## Methodology

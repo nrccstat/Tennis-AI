@@ -6,6 +6,12 @@ from sklearn.preprocessing import OneHotEncoder
 import pickle
 import os
 
+st.set_page_config(
+    page_title="Tennis Match Predictor",
+    page_icon="🎾",
+    layout="wide"
+)
+
 st.markdown('''
     <style>
     body {
@@ -50,12 +56,6 @@ st.markdown('''
     }
     </style>
 ''', unsafe_allow_html=True)
-
-st.set_page_config(
-    page_title="Tennis Match Predictor",
-    page_icon="🎾",
-    layout="wide"
-)
 
 st.title("🎾 Tennis Match Predictor")
 st.markdown("""
