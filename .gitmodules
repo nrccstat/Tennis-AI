@@ -1,0 +1,3 @@
+[submodule "TML-Database"]
+	path = TML-Database
+	url = https://github.com/Tennismylife/TML-Database.git
