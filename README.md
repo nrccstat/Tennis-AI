@@ -1,4 +1,4 @@
-# TennisAI: ATP Match Prediction
+# Tennis Match Prediction Model
 
 This project is a machine learning pipeline and web app for predicting ATP tennis match outcomes and simulating tournament brackets.
 
