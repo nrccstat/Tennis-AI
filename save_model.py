@@ -8,6 +8,12 @@ import xgboost as xgb
 from sklearn.model_selection import train_test_split, GridSearchCV
 from typing import Dict, List, Tuple
 from tqdm import tqdm
+
+def display_accuracy(model, X_test, y_test):
+    y_pred = model.predict(X_test)
+    acc = accuracy_score(y_test, y_pred)
+    print(f"Model accuracy: {acc * 100:.2f}%")
+from sklearn.metrics import accuracy_score, classification_report
 import multiprocessing
 from concurrent.futures import ProcessPoolExecutor
 import warnings
@@ -243,7 +249,8 @@ def main():
 
     print("Model and encoders saved successfully!")
     print(f"Trained on {len(df)} matches")
-
+    print("Evaluating model accuracy...")
+    display_accuracy(model, X_test, y_test)
 if __name__ == '__main__':
     multiprocessing.freeze_support()
-    main() 
+    main()
