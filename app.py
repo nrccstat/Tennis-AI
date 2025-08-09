@@ -1,436 +1,353 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.preprocessing import OneHotEncoder
 import pickle
 import os
+import math
+import random
 
-if not st.session_state.get("page_config_set", False):
-    st.set_page_config(
-        page_title="Tennis Match Predictor",
-        page_icon="🎾",
-        layout="wide",
-        initial_sidebar_state="auto"
-    )
-    st.session_state["page_config_set"] = True
+# --- Initial Page Configuration ---
+st.set_page_config(
+    page_title="Tennis Pro-Predictor",
+    page_icon="🎾",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
-if "player1" in st.session_state and "player2" in st.session_state:
-    if st.session_state.player1 == st.session_state.player2:
-        submitted = False
-
-submitted = False
-if "submitted" in locals():
-    if submitted and st.session_state.get("player1", None) == st.session_state.get("player2", None):
-        st.error("Player 1 and Player 2 cannot be the same. Please select two different players.")
-        submitted = False
-
+# --- Custom CSS for Styling ---
 st.markdown("""
     <style>
-    body, .stApp {
-        background: linear-gradient(135deg, #e3f0ff 0%, #c9e7f2 100%) !important;
-    }
-    .block-container {
-        background: rgba(220, 235, 250, 0.92) !important;
-        border-radius: 18px;
-        border-left: 8px solid #6bb3f2;
-        border-right: 8px solid #4f8cff;
-        padding: 1.5em 1em;
-    }
-    .stButton>button {
-        color: #fff;
-        background: linear-gradient(90deg, #4f8cff 0%, #6bb3f2 100%);
-        border-radius: 12px;
-        padding: 0.7em 2.5em;
-        font-weight: bold;
-        font-size: 1.15em;
-        box-shadow: 0 4px 16px rgba(79,140,255,0.10);
-        border: none;
-        transition: 0.2s;
-    }
-    .stButton>button:active {
-        background: linear-gradient(90deg, #4f8cff 0%, #6bb3f2 100%) !important;
-        color: #fff !important;
-    }
-    .stButton>button:hover {
-        background: linear-gradient(90deg, #6bb3f2 0%, #4f8cff 100%);
-        color: #fff;
-        box-shadow: 0 6px 24px rgba(79,179,255,0.18);
-    }
-    .stSelectbox>div>div>div>div {
-        border-radius: 12px;
-        font-size: 1.08em;
-        background: linear-gradient(90deg, #e3f0ff 0%, #c9e7f2 100%);
-        color: #333;
-    }
-    .stMetric {
-        background: linear-gradient(90deg, #4f8cff 0%, #6bb3f2 100%);
-        border-radius: 16px;
-        padding: 1.2em;
-        margin-bottom: 1.2em;
-        box-shadow: 0 4px 16px rgba(79,140,255,0.10);
-        color: #fff !important;
-    }
-    .stDataFrame, .stTable {
-        background: linear-gradient(90deg, #fff 0%, #e3f0ff 100%);
-        border-radius: 14px;
-        box-shadow: 0 4px 16px rgba(56,232,255,0.07);
-    }
-    .stAlert {
-        border-radius: 14px;
-        background: linear-gradient(90deg, #6bb3f2 0%, #4f8cff 100%);
-        color: #fff !important;
-    }
-    .stProgress > div > div > div > div {
-        background-image: linear-gradient(90deg, #4f8cff, #6bb3f2, #c9e7f2, #e3f0ff);
-        border-radius: 10px;
-    }
-    .stSubheader, .stHeader, .stTitle {
-        color: #4f8cff !important;
-        text-shadow: 1px 1px 0 #fff, 2px 2px 0 #6bb3f2;
-    }
-    .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
-        color: #4f8cff !important;
-        text-shadow: 1px 1px 0 #fff, 2px 2px 0 #6bb3f2;
-    }
-    /* Card effect for form */
-    .stForm {
-        background: linear-gradient(120deg, #e3f0ff 60%, #c9e7f2 100%);
-        border-radius: 20px;
-        box-shadow: 0 8px 32px rgba(79,140,255,0.10);
-        padding: 2em 2em 1em 2em;
-        margin-bottom: 2em;
-        border: 2px solid #6bb3f2;
-    }
-    /* Custom scrollbar */
-    ::-webkit-scrollbar {
-        width: 10px;
-        background: #e3f0ff;
-    }
-    ::-webkit-scrollbar-thumb {
-        background: linear-gradient(120deg, #6bb3f2 0%, #4f8cff 100%);
-        border-radius: 8px;
-    }
-    /* Animated gradient border for metrics */
-    .stMetric {
-        border: 3px solid;
-        border-image: linear-gradient(90deg, #4f8cff, #6bb3f2, #c9e7f2, #e3f0ff) 1;
-        animation: borderMove 3s linear infinite;
-    }
-    @keyframes borderMove {
-        0% { border-image-source: linear-gradient(90deg, #4f8cff, #6bb3f2, #c9e7f2, #e3f0ff);}
-        100% { border-image-source: linear-gradient(270deg, #4f8cff, #6bb3f2, #c9e7f2, #e3f0ff);}
-    }
-    .stTitle {
-        text-shadow: 0 0 8px #6bb3f2, 0 0 2px #4f8cff;
-    }
-    .stTable th {
-        background: linear-gradient(90deg, #4f8cff 0%, #6bb3f2 100%);
-        color: #fff;
-        font-weight: bold;
-    }
+        /* General Body and App Styling */
+        .stApp {
+            background: #f0f2f6;
+        }
+
+        /* Main container styling */
+        .block-container {
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+        }
+
+        /* Custom Button Styling */
+        .stButton>button {
+            border-radius: 10px;
+            padding: 0.75rem 1.5rem;
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: white;
+            background-color: #0072b5;
+            border: none;
+            transition: all 0.2s ease-in-out;
+        }
+        .stButton>button:hover {
+            background-color: #005f99;
+            transform: scale(1.02);
+            box-shadow: 0 6px 16px rgba(0,114,181,0.2);
+        }
+
+        /* Title and Header Styling */
+        .stTitle, h1, h2, h3, h4 {
+            color: #1E293B;
+        }
+        h1 {
+            text-align: center;
+        }
+
+        /* Metric Styling */
+        .stMetric {
+            background-color: #F8F9FA;
+            border-left: 5px solid #0072b5;
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        /* Tab Styling */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 24px;
+            justify-content: center; /* Center the tabs */
+        }
+        .stTabs [data-baseweb="tab"] {
+            height: 50px;
+            white-space: pre-wrap;
+            background-color: #F0F2F6;
+            border-radius: 8px;
+            padding: 10px 20px;
+            transition: all 0.2s ease-in-out;
+        }
+        .stTabs [aria-selected="true"] {
+            background-color: #0072b5;
+            color: white;
+            font-weight: bold;
+        }
+
+        /* --- BRACKET STYLING --- */
+        /* This is the new container that allows wrapping */
+        .bracket-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 16px; /* Space between matchups */
+        }
+
+        .bracket-matchup {
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+            flex: 1 1 200px; /* Flex properties: grow, shrink, basis */
+            max-width: 250px; /* Prevents items from becoming too wide */
+        }
+        .bracket-winner {
+            font-weight: bold;
+            color: #28a745;
+        }
+        .bracket-prob {
+            font-size: 0.85em;
+            color: #6c757d;
+        }
+
+        /* Style for Selectbox background */
+        .stSelectbox>div>div>div {
+            background-color: white !important;
+            color: #333 !important;
+            border-radius: 8px;
+            border: 1px solid #ced4da;
+        }
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown("""
-    <style>
-    body {
-        background: linear-gradient(135deg, #f8fafc 0%, #e0e7ef 100%);
-    }
-    .stApp {
-        background: linear-gradient(120deg, #f8fafc 0%, #e0e7ef 100%);
-    }
-    .stButton>button {
-        color: #fff;
-        background: linear-gradient(90deg, #ff4b4b 0%, #ffb347 100%);
-        border-radius: 12px;
-        padding: 0.7em 2.5em;
-        font-weight: bold;
-        font-size: 1.15em;
-        box-shadow: 0 4px 16px rgba(255,75,75,0.15);
-        border: none;
-        transition: 0.2s;
-    }
-    .stButton>button:hover {
-        background: linear-gradient(90deg, #ffb347 0%, #ff4b4b 100%);
-        color: #fff;
-        box-shadow: 0 6px 24px rgba(255,179,71,0.18);
-    }
-    .stSelectbox>div>div>div>div {
-        border-radius: 12px;
-        font-size: 1.08em;
-        background: linear-gradient(90deg, #e0e7ef 0%, #f8fafc 100%);
-        color: #333;
-    }
-    .stMetric {
-        background: linear-gradient(90deg, #4f8cff 0%, #38e8ff 100%);
-        border-radius: 16px;
-        padding: 1.2em;
-        margin-bottom: 1.2em;
-        box-shadow: 0 4px 16px rgba(79,140,255,0.10);
-        color: #fff !important;
-    }
-    .stDataFrame, .stTable {
-        background: linear-gradient(90deg, #fff 0%, #e0e7ef 100%);
-        border-radius: 14px;
-        box-shadow: 0 4px 16px rgba(56,232,255,0.07);
-    }
-    .stAlert {
-        border-radius: 14px;
-        background: linear-gradient(90deg, #ffb347 0%, #ff4b4b 100%);
-        color: #fff !important;
-    }
-    .stProgress > div > div > div > div {
-        background-image: linear-gradient(90deg, #4f8cff, #38e8ff, #ffb347, #ff4b4b);
-        border-radius: 10px;
-    }
-    .stSubheader, .stHeader, .stTitle {
-        color: #4f8cff !important;
-        text-shadow: 1px 1px 0 #fff, 2px 2px 0 #ffb347;
-    }
-    .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
-        color: #ff4b4b !important;
-        text-shadow: 1px 1px 0 #fff, 2px 2px 0 #4f8cff;
-    }
-    /* Card effect for form */
-    .stForm {
-        background: linear-gradient(120deg, #f8fafc 60%, #e0e7ef 100%);
-        border-radius: 20px;
-        box-shadow: 0 8px 32px rgba(79,140,255,0.10);
-        padding: 2em 2em 1em 2em;
-        margin-bottom: 2em;
-        border: 2px solid #ffb347;
-    }
-    /* Custom scrollbar */
-    ::-webkit-scrollbar {
-        width: 10px;
-        background: #e0e7ef;
-    }
-    ::-webkit-scrollbar-thumb {
-        background: linear-gradient(120deg, #ffb347 0%, #ff4b4b 100%);
-        border-radius: 8px;
-    }
-    /* Animated gradient border for metrics */
-    .stMetric {
-        border: 3px solid;
-        border-image: linear-gradient(90deg, #4f8cff, #38e8ff, #ffb347, #ff4b4b) 1;
-        animation: borderMove 3s linear infinite;
-    }
-    @keyframes borderMove {
-        0% { border-image-source: linear-gradient(90deg, #4f8cff, #38e8ff, #ffb347, #ff4b4b);}
-        100% { border-image-source: linear-gradient(270deg, #4f8cff, #38e8ff, #ffb347, #ff4b4b);}
-    }
-    /* Add a subtle glow to the title */
-    .stTitle {
-        text-shadow: 0 0 8px #ffb347, 0 0 2px #4f8cff;
-    }
-    /* Add color to table headers */
-    .stTable th {
-        background: linear-gradient(90deg, #4f8cff 0%, #38e8ff 100%);
-        color: #fff;
-        font-weight: bold;
-    }
-    /* Add a colored border to columns */
-    .block-container {
-        border-left: 8px solid #ffb347;
-        border-right: 8px solid #4f8cff;
-        border-radius: 18px;
-        padding: 1.5em 1em;
-        background: linear-gradient(120deg, #f8fafc 80%, #e0e7ef 100%);
-    }
-    </style>
-""", unsafe_allow_html=True)
 
-st.title("🎾 Tennis Match Predictor")
-st.markdown("""
-Predict the outcome of tennis matches using our machine learning model!
-Enter the names of both players and the court surface to get a prediction.
-""")
-
+# --- Data and Model Loading (Cached) ---
 @st.cache_data
 def load_data():
-    data_dir = 'TML-Database/'
-    csv_files = sorted([f for f in os.listdir(data_dir) if f.endswith('.csv')])
-    df_list = [pd.read_csv(os.path.join(data_dir, f)) for f in csv_files]
-    df = pd.concat(df_list, ignore_index=True)
-    df = df.sort_values('tourney_date')
-    from src.feature_engineering import calculate_elo
-    df = calculate_elo(df)
-    return df
+    """Loads and preprocesses tennis data, calculating Elo ratings."""
+    try:
+        data_dir = 'TML-Database/'
+        csv_files = sorted([f for f in os.listdir(data_dir) if f.endswith('.csv')])
+        if not csv_files:
+            st.error("No CSV files found in the 'TML-Database' directory. Please add your data files.")
+            return pd.DataFrame(), []
+
+        df_list = [pd.read_csv(os.path.join(data_dir, f)) for f in csv_files]
+        df = pd.concat(df_list, ignore_index=True)
+        df['tourney_date'] = pd.to_datetime(df['tourney_date'], format='%Y%m%d')
+        df = df.sort_values('tourney_date')
+
+        from src.feature_engineering import calculate_elo
+        df = calculate_elo(df)
+
+        all_players = sorted(pd.concat([df['winner_name'], df['loser_name']]).dropna().unique())
+        return df, all_players
+    except (FileNotFoundError, ImportError) as e:
+        st.error(f"Error loading data or dependencies: {e}. Please ensure `TML-Database` and `src/feature_engineering.py` are correctly placed.")
+        return pd.DataFrame(), []
 
 @st.cache_resource
 def load_model():
-    model = pickle.load(open('models/tennis_model.pkl', 'rb'))
-    encoder = pickle.load(open('models/encoder.pkl', 'rb'))
-    feature_columns = pickle.load(open('models/feature_columns.pkl', 'rb'))
-    base_features = [col for col in feature_columns if not col.startswith('surface_')]
-    return model, encoder, base_features
+    """Loads the pickled model, encoder, and feature columns."""
+    try:
+        with open('models/tennis_model.pkl', 'rb') as f_model:
+            model = pickle.load(f_model)
+        with open('models/encoder.pkl', 'rb') as f_encoder:
+            encoder = pickle.load(f_encoder)
+        with open('models/feature_columns.pkl', 'rb') as f_cols:
+            feature_columns = pickle.load(f_cols)
+        return model, encoder, feature_columns
+    except FileNotFoundError:
+        st.error("Model files not found in the 'models' directory.")
+        return None, None, None
 
-df = load_data()
-all_players = sorted(set(df['winner_name'].unique()) | set(df['loser_name'].unique()))
+# --- NEW: A single function to initialize the app, which we can cache ---
+@st.cache_resource (show_spinner=False)
+def initialize_app():
+    """Load all data and models. This function will be cached."""
+    df, all_players = load_data()
+    model, encoder, feature_columns = load_model()
+    return df, all_players, model, encoder, feature_columns
 
+# --- Use st.spinner for the initial load ---
+with st.spinner("Loading..."):
+    df, all_players, model, encoder, feature_columns = initialize_app()
+
+# If loading fails, stop the app
+if df is None or all_players is None or model is None:
+    st.error("Application failed to initialize. Please check the data and model files.")
+    st.stop()
+
+
+# --- Core Logic Functions ---
 def get_player_stats(player_name, df):
+    """Retrieves the latest stats for a given player."""
     player_matches = df[(df['winner_name'] == player_name) | (df['loser_name'] == player_name)]
-    if len(player_matches) == 0:
-        return None
-    recent_match = player_matches.iloc[-1]
-    is_winner = recent_match['winner_name'] == player_name
+    if player_matches.empty: return None
+    last_match = player_matches.iloc[-1]
+    is_winner = last_match['winner_name'] == player_name
     return {
-        'elo': recent_match['winner_elo'] if is_winner else recent_match['loser_elo'],
-        'age': recent_match['winner_age'] if is_winner else recent_match['loser_age'],
-        'height': recent_match['winner_ht'] if is_winner else recent_match['loser_ht']
+        'elo': last_match['winner_elo'] if is_winner else last_match['loser_elo'],
+        'age': last_match['winner_age'] if is_winner else last_match['loser_age'],
+        'height': last_match['winner_ht'] if is_winner else last_match['loser_ht']
     }
 
-with st.form("match_prediction_form"):
-    st.subheader("Match Details")
-    court_type = st.selectbox(
-        "Court Surface",
-        ["Hard", "Clay", "Grass", "Carpet"]
-    )
-    col1, col2 = st.columns(2)
-    with col1:
-        player1 = st.selectbox("Player 1", all_players)
-    with col2:
-        player2 = st.selectbox("Player 2", all_players)
-    submitted = st.form_submit_button("Predict Match Outcome")
+def predict_match(player1_name, player2_name, court_type, df, model, encoder, feature_columns):
+    """Predicts the outcome of a match between two players."""
+    p1_stats = get_player_stats(player1_name, df)
+    p2_stats = get_player_stats(player2_name, df)
 
-if submitted:
-    if player1 == player2:
-        st.error("Player 1 and Player 2 cannot be the same. Please select two different players.")
-    else:
-        try:
-            model, encoder, base_features = load_model()
-            p1_stats = get_player_stats(player1, df)
-            p2_stats = get_player_stats(player2, df)
-            if p1_stats is None or p2_stats is None:
-                st.error("Could not find historical data for one or both players.")
+    if not p1_stats or not p2_stats:
+        return None, None, "Could not find historical data for one or both players."
+
+    input_data = pd.DataFrame({
+        'surface': [court_type], 'winner_elo': [p1_stats['elo']], 'loser_elo': [p2_stats['elo']],
+        'winner_age': [p1_stats['age']], 'loser_age': [p2_stats['age']],
+        'winner_ht': [p1_stats['height']], 'loser_ht': [p2_stats['height']],
+        'winner_recent_form': [p1_stats['elo']], 'loser_recent_form': [p2_stats['elo']],
+        'winner_surface_win_rate': [0.5], 'loser_surface_win_rate': [0.5], 'h2h_matches': [0],
+        'winner_tourney_wins': [0], 'loser_tourney_wins': [0],
+        'winner_days_since_last_match': [0], 'loser_days_since_last_match': [0]
+    })
+
+    numeric_cols = [col for col in feature_columns if not col.startswith('surface_')]
+    input_numeric = input_data.reindex(columns=numeric_cols).fillna(0)
+    X_cat_encoded = encoder.transform(input_data[['surface']])
+    X = np.hstack([input_numeric.values, X_cat_encoded])
+    probability = model.predict_proba(X)[0]
+    return probability, (p1_stats, p2_stats), None
+
+# --- Main Application ---
+st.title("🎾 Tennis Pro-Predictor")
+st.markdown("<h3 style='text-align: center; color: #4A5568;'>From Head-to-Head Showdowns to Full Tournament Simulations</h3>", unsafe_allow_html=True)
+
+# The data is already loaded above, so we can now display the UI
+if df.empty or not model:
+    st.warning("Application cannot start due to missing data or model files.")
+    st.stop()
+
+# --- UI Tabs ---
+tab1, tab2 = st.tabs(["⚡ Head-to-Head", "🏆 Tournament Bracket"])
+
+# ============================
+#  Tab 1: Head-to-Head
+# ============================
+with tab1:
+    st.subheader("Match Setup")
+    p1 = st.selectbox("Select Player 1", all_players, index=12, key="h2h_p1")
+    p2 = st.selectbox("Select Player 2", all_players, index=34, key="h2h_p2")
+    court = st.selectbox("Select Court Surface", ["Hard", "Clay", "Grass", "Carpet"], key="h2h_court")
+
+    _, btn_col, _ = st.columns([2.5, 1, 2.5])
+    with btn_col:
+        predict_button = st.button("Predict Outcome", key="h2h_predict", use_container_width=True)
+
+    if predict_button:
+        st.markdown("---")
+        if p1 == p2:
+            st.error("Players must be different. Please select two unique players.")
+        else:
+            prob, stats, error_msg = predict_match(p1, p2, court, df, model, encoder, feature_columns)
+            if error_msg:
+                st.error(error_msg)
             else:
-                input_data = pd.DataFrame({
-                    'surface': [court_type],
-                    'winner_elo': [p1_stats['elo']],
-                    'loser_elo': [p2_stats['elo']],
-                    'winner_age': [p1_stats['age']],
-                    'winner_ht': [p1_stats['height']],
-                    'loser_age': [p2_stats['age']],
-                    'loser_ht': [p2_stats['height']],
-                    'winner_recent_form': [p1_stats['elo']],  
-                    'loser_recent_form': [p2_stats['elo']],   
-                    'winner_surface_win_rate': [0.5],  
-                    'loser_surface_win_rate': [0.5],   
-                    'h2h_matches': [0],               
-                    'winner_tourney_wins': [0],        
-                    'loser_tourney_wins': [0],         
-                    'winner_days_since_last_match': [0], 
-                    'loser_days_since_last_match': [0]   
-                })
-                
-                numeric_columns = [
-                    'winner_elo', 'loser_elo', 'winner_age', 'winner_ht', 'loser_age', 'loser_ht',
-                    'winner_recent_form', 'loser_recent_form', 'winner_surface_win_rate', 'loser_surface_win_rate',
-                    'h2h_matches', 'winner_tourney_wins', 'loser_tourney_wins',
-                    'winner_days_since_last_match', 'loser_days_since_last_match'
-                ]
-                
-                cat_features = ['surface']
-                X_cat = input_data[cat_features]
-                X_cat_encoded = encoder.transform(X_cat)
-                
-                input_data[numeric_columns] = input_data[numeric_columns].fillna(0)
-                X_num = input_data[numeric_columns].values
-                X = np.hstack([X_num, X_cat_encoded])
-                prob = model.predict_proba(X)[0]
-                st.subheader("Prediction Results")
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.metric(
-                        label=f"{player1} Win Probability",
-                        value=f"{prob[1]*100:.1f}%"
-                    )
-                with col2:
-                    st.metric(
-                        label=f"{player2} Win Probability",
-                        value=f"{prob[0]*100:.1f}%"
-                    )
-                st.progress(prob[1])
-                st.subheader("Match Insights")
-                if prob[1] > 0.7:
-                    st.success(f"Strong favorite: {player1}")
-                elif prob[1] < 0.3:
-                    st.success(f"Strong favorite: {player2}")
-                else:
-                    st.info("This is a close match!")
-                st.subheader("Player Statistics")
-                stats_df = pd.DataFrame({
-                    'Player': [player1, player2],
-                    'Elo': [p1_stats['elo'], p2_stats['elo']],
-                    'Age': [p1_stats['age'], p2_stats['age']],
-                    'Height (cm)': [p1_stats['height'], p2_stats['height']]
-                })
-                st.table(stats_df)
-        except Exception as e:
-            st.error(f"An error occurred: {str(e)}")
-            st.info("Please make sure the model files are available in the 'models' directory.")
+                p1_stats, p2_stats = stats
+                p1_prob, p2_prob = prob[1], prob[0]
+                st.subheader("📈 Prediction Results")
+                res_col1, res_col2 = st.columns(2)
+                with res_col1:
+                    st.metric(label=f"{p1} Win Probability", value=f"{p1_prob*100:.1f}%")
+                    st.progress(p1_prob)
+                with res_col2:
+                    st.metric(label=f"{p2} Win Probability", value=f"{p2_prob*100:.1f}%")
+                    st.progress(p2_prob)
 
+                st.subheader("📊 Head-to-Head Stats")
+                stats_df = pd.DataFrame([
+                    {'Player': p1, 'Elo Rating': f"{p1_stats['elo']:.0f}", 'Age': f"{p1_stats['age']:.1f}", 'Height (cm)': f"{p1_stats['height']:.0f}"},
+                    {'Player': p2, 'Elo Rating': f"{p2_stats['elo']:.0f}", 'Age': f"{p2_stats['age']:.1f}", 'Height (cm)': f"{p2_stats['height']:.0f}"}
+                ]).set_index('Player')
+                st.dataframe(stats_df, use_container_width=True)
+
+# ============================
+#  Tab 2: Tournament Bracket
+# ============================
+with tab2:
+    st.subheader("Build Your Bracket")
+    tourney_court = st.selectbox("Select Tournament Court Surface", ["Hard", "Clay", "Grass", "Carpet"], key="tourney_court")
+    num_players = st.radio("Select Bracket Size", [4, 8, 16, 32], index=1, horizontal=True, key="tourney_size")
+
+    st.info(f"Select **{num_players}** unique players to enter the tournament.")
+
+    if 'tourney_players' not in st.session_state or len(st.session_state.tourney_players) != num_players:
+        st.session_state.tourney_players = [all_players[i * 10 % len(all_players)] for i in range(num_players)]
+
+    cols = st.columns(4)
+    for i in range(num_players):
+        st.session_state.tourney_players[i] = cols[i % 4].selectbox(
+            f"Player {i+1}", all_players,
+            index=all_players.index(st.session_state.tourney_players[i]),
+            key=f"tourney_p{i}"
+        )
+
+    _, btn_col_tourney, _ = st.columns([2.5, 1, 2.5])
+    with btn_col_tourney:
+        simulate_button = st.button("Simulate Tournament", key="tourney_sim", use_container_width=True)
+
+    if simulate_button:
+        st.markdown("---")
+        selected_players = st.session_state.tourney_players
+        if len(set(selected_players)) != num_players:
+            st.error("All selected players must be unique. Please check your selections.")
+        else:
+            random.shuffle(selected_players)
+            st.subheader("🏆 Tournament Results")
+
+            round_names = {32: "Round of 32", 16: "Round of 16", 8: "Quarterfinals", 4: "Semifinals", 2: "Final"}
+            current_round_players = selected_players
+            current_round_size = len(current_round_players)
+
+            while current_round_size >= 2:
+                round_name = round_names.get(current_round_size, f"Round of {current_round_size}")
+                st.markdown(f"#### {round_name}")
+
+                next_round_winners = []
+                matchups = [current_round_players[i:i+2] for i in range(0, len(current_round_players), 2)]
+                
+                # Use the new flexible container instead of st.columns
+                matchup_html = ""
+                for matchup in matchups:
+                    p1, p2 = matchup[0], matchup[1]
+                    prob, _, error_msg = predict_match(p1, p2, tourney_court, df, model, encoder, feature_columns)
+
+                    if error_msg:
+                        st.warning(f"Sim Error: {p1} vs {p2}")
+                        winner, p1_prob, p2_prob = random.choice([p1, p2]), 0.5, 0.5
+                    else:
+                        p1_prob, p2_prob = prob[1], prob[0]
+                        winner = p1 if p1_prob > p2_prob else p2
+
+                    next_round_winners.append(winner)
+                    
+                    matchup_html += (f'<div class="bracket-matchup">'
+                                     f'<div>{p1}<span class="bracket-prob"> ({p1_prob*100:.1f}%)</span></div>'
+                                     f'<div style="margin: 2px 0; font-size: 0.8em;">vs</div>'
+                                     f'<div>{p2}<span class="bracket-prob"> ({p2_prob*100:.1f}%)</span></div>'
+                                     f'<hr style="margin: 6px 0;">'
+                                     f'<div class="bracket-winner">🏆 {winner}</div>'
+                                     f'</div>')
+                
+                # Display all matchups inside the wrapping container
+                st.markdown(f'<div class="bracket-container">{matchup_html}</div>', unsafe_allow_html=True)
+
+                current_round_players = next_round_winners
+                current_round_size = len(current_round_players)
+                if current_round_size >= 2: st.markdown("---")
+
+            st.markdown(f"<h2 style='text-align:center; color: #0072b5;'>🎉 Tournament Champion 🎉</h2>", unsafe_allow_html=True)
+            st.markdown(f"<h1 style='text-align:center;'>{current_round_players[0]}</h1>", unsafe_allow_html=True)
+            st.balloons()
+
+
+# --- Footer ---
 st.markdown("---")
-st.markdown("""
-    <style>
-    body {
-        background: linear-gradient(135deg, #f8fafc 0%, #e0e7ef 100%);
-    }
-    .stApp {
-        background: linear-gradient(120deg, #f8fafc 0%, #e0e7ef 100%);
-    }
-    .stButton>button {
-        color: #fff;
-        background: linear-gradient(90deg, #ff4b4b 0%, #ffb347 100%);
-        border-radius: 12px;
-        padding: 0.7em 2.5em;
-        font-weight: bold;
-        font-size: 1.15em;
-        box-shadow: 0 4px 16px rgba(255,75,75,0.15);
-        border: none;
-        transition: 0.2s;
-    }
-    .stButton>button:hover {
-        background: linear-gradient(90deg, #ffb347 0%, #ff4b4b 100%);
-        color: #fff;
-        box-shadow: 0 6px 24px rgba(255,179,71,0.18);
-    }
-    .stSelectbox>div>div>div>div {
-        border-radius: 12px;
-        font-size: 1.08em;
-        background: linear-gradient(90deg, #e0e7ef 0%, #f8fafc 100%);
-        color: #333;
-    }
-    .stMetric {
-        background: linear-gradient(90deg, #4f8cff 0%, #38e8ff 100%);
-        border-radius: 16px;
-        padding: 1.2em;
-        margin-bottom: 1.2em;
-        box-shadow: 0 4px 16px rgba(79,140,255,0.10);
-        color: #fff !important;
-    }
-    .stDataFrame, .stTable {
-        background: linear-gradient(90deg, #fff 0%, #e0e7ef 100%);
-        border-radius: 14px;
-        box-shadow: 0 4px 16px rgba(56,232,255,0.07);
-    }
-    .stAlert {
-        border-radius: 14px;
-        background: linear-gradient(90deg, #ffb347 0%, #ff4b4b 100%);
-        color: #fff !important;
-    }
-    .stProgress > div > div > div > div {
-        background-image: linear-gradient(90deg, #4f8cff, #38e8ff, #ffb347, #ff4b4b);
-        border-radius: 10px;
-    }
-    .stSubheader, .stHeader, .stTitle {
-        color: #4f8cff !important;
-        text-shadow: 1px 1px 0 #fff, 2px 2px 0 #ffb347;
-    }
-    .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
-        color: #ff4b4b !important;
-        text-shadow: 1px 1px 0 #fff, 2px 2px 0 #4f8cff;
-# The error for same player selection is now handled above, so this is no longer needed.
-""", unsafe_allow_html=True)
-st.markdown("© 2024 <span style='color:#ff4b4b;font-weight:bold;'>Tennis Match Predictor</span>. All rights reserved.", unsafe_allow_html=True)
+st.markdown("© 2025 <span style='color:#0072b5;font-weight:bold;'>Tennis Pro-Predictor</span>. Model based on historical ATP data.", unsafe_allow_html=True)
